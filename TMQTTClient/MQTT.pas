@@ -96,11 +96,12 @@ type
   TRemainingLength = array of byte;
   TUTF8Text = array of byte;
 
-  PMQTTClient = ^TMQTTClient;
-
   // Main object - MQTT client implementation
+
+  { TMQTTClient }
+
   TMQTTClient = class(TObject)
-  private
+  protected
     FClientID: ansistring;
     FHostname: ansistring;
     FPort: integer;
@@ -137,14 +138,16 @@ type
       retain: boolean);
     procedure OnRTTerminate(Sender: TObject);
 
+    // virtual creator for Thread class.
+    // 'Virtual Constructor' (aka 'Factory Method') - you can overload the TMQTTReadThread class.
+    function CreateMQTTThread: TMQTTReadThread; virtual;
+
   public
     function isConnected: boolean;
     procedure Connect;
     function Disconnect: boolean;
     procedure ForceDisconnect;
-    function Publish(Topic: ansistring; sPayload: ansistring): boolean; overload;
-    function Publish(Topic: ansistring; sPayload: ansistring;
-      Retain: boolean): boolean; overload;
+    function Publish(Topic, sPayload: ansistring; Retain: boolean = false): boolean;
     function Subscribe(Topic: ansistring): integer;
     function Unsubscribe(Topic: ansistring): integer;
     function PingReq: boolean;
@@ -220,7 +223,7 @@ begin
       FReadThread.OnTerminate := nil;
       FreeAndNil(FReadThread);
     end;
-    FReadThread := TMQTTReadThread.Create(FHostname, FPort);
+    FReadThread := CreateMQTTThread();
     FReadThread.OnConnAck := @OnRTConnAck;
     FReadThread.OnPublish := @OnRTPublish;
     FReadThread.OnPublish := @OnRTPublish;
@@ -292,6 +295,11 @@ begin
   WriteLn('TMQTTClient.OnRTTerminate: Thread.Terminated.');
 end;
 
+function TMQTTClient.CreateMQTTThread: TMQTTReadThread;
+begin
+  Result := TMQTTReadThread.Create(FHostname, FPort);
+end;
+
 {*------------------------------------------------------------------------------
   Sends a PINGREQ to the server informing it that the client is alice and that it
   should send a PINGRESP back in return.
@@ -324,7 +332,7 @@ end;
   @param Retain   Should this message be retained for clients connecting subsequently
   @return Returns whether the Data was written successfully to the socket.
 ------------------------------------------------------------------------------*}
-function TMQTTClient.Publish(Topic, sPayload: ansistring; Retain: boolean): boolean;
+function TMQTTClient.Publish(Topic, sPayload: ansistring; Retain: boolean = false): boolean;
 var
   Data: TBytes;
   FH: byte;
@@ -344,18 +352,6 @@ begin
     Result := True
   else
     Result := False;
-end;
-
-{*------------------------------------------------------------------------------
-  Publishes a message sPayload to the Topic on the remote broker with the retain flag
-  defined as False.
-  @param Topic   The Topic Name of your message eg /station1/temperature/
-  @param sPayload   The Actual Payload of the message eg 18 degrees celcius
-  @return Returns whether the Data was written successfully to the socket.
-------------------------------------------------------------------------------*}
-function TMQTTClient.Publish(Topic, sPayload: ansistring): boolean;
-begin
-  Result := Publish(Topic, sPayload, False);
 end;
 
 {*------------------------------------------------------------------------------

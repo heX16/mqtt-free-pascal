@@ -1,6 +1,3 @@
-
-
-
 {
  -------------------------------------------------
   embeddedApp.pas -  An example of using the MQTT Client from a command line program
@@ -38,193 +35,192 @@ program embeddedApp;
 
 // cthreads is required to get the MQTTReadThread working.
 
-uses
-  {$IFDEF UNIX} {$IFDEF UseCThreads}
+uses {$IFDEF UNIX} {$IFDEF UseCThreads}
   cthreads, {$ENDIF} {$ENDIF}
-  Classes, MQTT, laz_synapse, sysutils;
+  Classes,
+  MQTT,
+  laz_synapse,
+  SysUtils;
 
 // The major states of the application.
 
 const
-  pubTimerInterval = 60*10; // 60 - 1 minute
-  pingTimerInterval = 10*10; // 10 - ping every 10 sec
+  pubTimerInterval = 60 * 10; // 60 - 1 minute
+  pingTimerInterval = 10 * 10; // 10 - ping every 10 sec
   MQTT_Server = '192.168.1.19';
   MQTT_Topic = '/jack/says';
   //MQTT_Server = '192.168.0.26';
 
-type TembeddedAppStates = (
-                           CONNECT,
-                           WAIT_CONNECT,
-                           RUNNING,
-                           FAILING
-                          );
+type
+  TembeddedAppStates = (
+    CONNECT,
+    WAIT_CONNECT,
+    RUNNING,
+    FAILING
+    );
 
-type 
+type
   // Define class for the embedded application
   TembeddedApp = object
-    strict
-    private
-      MQTTClient: TMQTTClient;
-      pingCounter : integer;
-      pingTimer : integer;
-      state : TembeddedAppStates;
-      message : ansistring;
-      pubTimer : integer;
-      connectTimer : integer;
-    public
-      terminate: boolean;
-      procedure run ();
-    end;
+  strict  private
+    MQTTClient: TMQTTClient;
+    pingCounter: integer;
+    pingTimer: integer;
+    state: TembeddedAppStates;
+    message: ansistring;
+    pubTimer: integer;
+    connectTimer: integer;
+  public
+    terminate: boolean;
+    procedure run();
+  end;
 
-    procedure TembeddedApp.run();
+procedure TembeddedApp.run();
+var
+  msg: TMQTTMessage;
+  ack: TMQTTMessageAck;
+begin
+  writeln('embeddedApp MQTT Client.');
+  state := CONNECT;
 
-    var 
-      msg : TMQTTMessage;
-      ack : TMQTTMessageAck;
-    begin
-      writeln ('embeddedApp MQTT Client.');
-      state := CONNECT;
+  message :=
+    'All work and no play makes Jack a dull boy. All work and no play makes Jack a dull boy.';
 
-      message := 
-           'All work and no play makes Jack a dull boy. All work and no play makes Jack a dull boy.'
-      ;
+  MQTTClient := TMQTTClient.Create(MQTT_Server, 1883);
 
-      MQTTClient := TMQTTClient.Create(MQTT_Server, 1883);
-
-      while not terminate do
+  while not terminate do
+  begin
+    case state of
+      CONNECT:
+      begin
+        // Connect to MQTT server
+        pingCounter := 0;
+        pingTimer := 0;
+        pubTimer := 0;
+        connectTimer := 0;
+        MQTTClient.Connect;
+        state := WAIT_CONNECT;
+      end;
+      WAIT_CONNECT:
+      begin
+        // Can only move to RUNNING state on recieving ConnAck
+        connectTimer := connectTimer + 1;
+        if connectTimer > 300 then
         begin
-          case state of 
-            CONNECT :
-                      begin
-                        // Connect to MQTT server
-                        pingCounter := 0;
-                        pingTimer := 0;
-                        pubTimer := 0;
-                        connectTimer := 0;
-                        MQTTClient.Connect;
-                        state := WAIT_CONNECT;
-                      end;
-            WAIT_CONNECT :
-                           begin
-                             // Can only move to RUNNING state on recieving ConnAck 
-                             connectTimer := connectTimer + 1;
-                             if connectTimer > 300 then
-                               begin
-                                 Writeln('embeddedApp: Error: ConnAck time out.');
-                                 state := FAILING;
-                               end;
-                           end;
-            RUNNING :
-                      begin
-                        // Publish stuff
-                        if pubTimer mod pubTimerInterval = 0 then
-                          begin
-                            if not MQTTClient.Publish(MQTT_Topic, message) then
-                              begin
-                                writeln ('embeddedApp: Error: Publish Failed.');
-                                state := FAILING;
-                              end;
-                          end;
-                        pubTimer := pubTimer + 1;
-
-                        // Ping the MQTT server occasionally 
-                        if (pingTimer mod 100) = 0 then
-                          begin
-                            // Time to PING !
-                            if not MQTTClient.PingReq then
-                              begin
-                                writeln ('embeddedApp: Error: PingReq Failed.');
-                                state := FAILING;
-                              end;
-                            pingCounter := pingCounter + 1;
-                            // Check that pings are being answered
-                            if pingCounter > 3 then
-                              begin
-                                writeln ('embeddedApp: Error: Ping timeout.');
-                                state := FAILING;
-                              end;
-                          end;
-                        pingTimer := pingTimer + 1;
-                      end;
-            FAILING :
-                      begin
-                        MQTTClient.ForceDisconnect;
-                        state := CONNECT;
-                      end;
-          end;
-
-          // Read incomming MQTT messages.
-          repeat
-            msg := MQTTClient.getMessage;
-            if Assigned(msg) then
-              begin
-                writeln ('getMessage: ' + msg.topic + ' Payload: ' + msg.payload);
-
-                if msg.PayLoad = 'stop' then
-                  terminate := true;
-
-                // Important to free messages here. 
-                msg.free;
-              end;
-          until not Assigned(msg);
-
-          // Read incomming MQTT message acknowledgments
-          repeat
-            ack := MQTTClient.getMessageAck;
-            if Assigned(ack) then
-              begin
-                case ack.messageType of 
-                  CONNACK :
-                            begin
-                              if ack.returnCode = 0 then
-                                begin
-                                  // Make subscriptions
-                                  MQTTClient.Subscribe(MQTT_Topic);
-                                  // Enter the running state
-                                  state := RUNNING;
-                                end
-                              else
-                                state := FAILING;
-                            end;
-                  PINGRESP :
-                             begin
-                               writeln ('PING! PONG!');
-                               // Reset ping counter to indicate all is OK.
-                               pingCounter := 0;
-                             end;
-                  SUBACK :
-                           begin
-                             write   ('SUBACK: ');
-                             write   (ack.messageId);
-                             write   (', ');
-                             writeln (ack.qos);
-                           end;
-                  UNSUBACK :
-                             begin
-                               write   ('UNSUBACK: ');
-                               writeln (ack.messageId);
-                             end;
-                end;
-              end;
-            // Important to free messages here. 
-            ack.free;
-          until not Assigned(ack);
-
-          // Main application loop must call this else we leak threads!
-          CheckSynchronize;
-
-          // Yawn.
-          sleep(100);
+          Writeln('embeddedApp: Error: ConnAck time out.');
+          state := FAILING;
         end;
+      end;
+      RUNNING:
+      begin
+        // Publish stuff
+        if pubTimer mod pubTimerInterval = 0 then
+        begin
+          if not MQTTClient.Publish(MQTT_Topic, message) then
+          begin
+            writeln('embeddedApp: Error: Publish Failed.');
+            state := FAILING;
+          end;
+        end;
+        pubTimer := pubTimer + 1;
 
+        // Ping the MQTT server occasionally
+        if (pingTimer mod 100) = 0 then
+        begin
+          // Time to PING !
+          if not MQTTClient.PingReq then
+          begin
+            writeln('embeddedApp: Error: PingReq Failed.');
+            state := FAILING;
+          end;
+          pingCounter := pingCounter + 1;
+          // Check that pings are being answered
+          if pingCounter > 3 then
+          begin
+            writeln('embeddedApp: Error: Ping timeout.');
+            state := FAILING;
+          end;
+        end;
+        pingTimer := pingTimer + 1;
+      end;
+      FAILING:
+      begin
         MQTTClient.ForceDisconnect;
-        FreeAndNil(MQTTClient);
+        state := CONNECT;
+      end;
     end;
 
-    var 
-      app : TembeddedApp;
+    // Read incomming MQTT messages.
+    repeat
+      msg := MQTTClient.getMessage;
+      if Assigned(msg) then
+      begin
+        writeln('getMessage: ' + msg.topic + ' Payload: ' + msg.payload);
 
-      // main
-    begin
-      app.run;
-    end.
+        if msg.PayLoad = 'stop' then
+          terminate := True;
+
+        // Important to free messages here.
+        msg.Free;
+      end;
+    until not Assigned(msg);
+
+    // Read incomming MQTT message acknowledgments
+    repeat
+      ack := MQTTClient.getMessageAck;
+      if Assigned(ack) then
+      begin
+        case ack.messageType of
+          CONNACK:
+          begin
+            if ack.returnCode = 0 then
+            begin
+              // Make subscriptions
+              MQTTClient.Subscribe(MQTT_Topic);
+              // Enter the running state
+              state := RUNNING;
+            end
+            else
+              state := FAILING;
+          end;
+          PINGRESP:
+          begin
+            writeln('PING! PONG!');
+            // Reset ping counter to indicate all is OK.
+            pingCounter := 0;
+          end;
+          SUBACK:
+          begin
+            Write('SUBACK: ');
+            Write(ack.messageId);
+            Write(', ');
+            writeln(ack.qos);
+          end;
+          UNSUBACK:
+          begin
+            Write('UNSUBACK: ');
+            writeln(ack.messageId);
+          end;
+        end;
+      end;
+      // Important to free messages here.
+      ack.Free;
+    until not Assigned(ack);
+
+    // Main application loop must call this else we leak threads!
+    CheckSynchronize;
+
+    // Yawn.
+    sleep(100);
+  end;
+
+  MQTTClient.ForceDisconnect;
+  FreeAndNil(MQTTClient);
+end;
+
+var
+  app: TembeddedApp;
+
+begin
+  app.run;
+end.
