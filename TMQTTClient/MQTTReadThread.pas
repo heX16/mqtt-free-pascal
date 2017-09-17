@@ -61,7 +61,7 @@ type
   TUnSubAckEvent = procedure(Sender: TObject; MessageID: integer) of object;
 
   TMQTTReadThread = class(TThread)
-  private
+  protected
     FClientID: ansistring;
     FHostname: ansistring;
     FPort: integer;
@@ -78,9 +78,8 @@ type
 
     // This is our data processing and event firing command.
     procedure HandleData;
-  protected
-    procedure Execute;
-      override;
+
+    procedure Execute; override;
   public
     //todo: change Socket resurse working
     FPSocket: TTCPBlockSocket;
@@ -286,8 +285,10 @@ begin
         // Get the Topic
         SetString(Topic, PChar(@CurrentMessage.Data[2]), DataLen);
         // Get the Payload
-        SetString(Payload, PChar(@CurrentMessage.Data[2 + DataLen]),
-          (Length(CurrentMessage.Data) - 2 - DataLen));
+        if Length(CurrentMessage.Data) - 2 - DataLen <= 0 then
+          Payload:='' else
+          SetString(Payload, PChar(@CurrentMessage.Data[2 + DataLen]),
+            (Length(CurrentMessage.Data) - 2 - DataLen));
         if Assigned(OnPublish) then
           OnPublish(Self, Topic, Payload, retain);
       end
