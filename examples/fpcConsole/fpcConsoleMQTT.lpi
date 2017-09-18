@@ -14,7 +14,7 @@
       <UseAppBundle Value="False"/>
       <ResourceType Value="res"/>
     </General>
-    <BuildModes Count="2">
+    <BuildModes Count="3">
       <Item1 Name="debug_wnd_x86" Default="True"/>
       <Item2 Name="debug_lnx_arm">
         <CompilerOptions>
@@ -50,10 +50,43 @@
             </Debugging>
           </Linking>
           <Other>
-            <CustomOptions Value="-dUseCThreads"/>
+            <CustomOptions Value="-dUseCThreads
+-dDEBUG_MQTT"/>
           </Other>
         </CompilerOptions>
       </Item2>
+      <Item3 Name="release">
+        <CompilerOptions>
+          <Version Value="11"/>
+          <PathDelim Value="\"/>
+          <Target>
+            <Filename Value="fpcConsoleMQTT"/>
+          </Target>
+          <SearchPaths>
+            <IncludeFiles Value="$(ProjOutDir)"/>
+            <OtherUnitFiles Value="..\..\TMQTTClient"/>
+            <UnitOutputDirectory Value="lib\$(TargetCPU)-$(TargetOS)"/>
+          </SearchPaths>
+          <CodeGeneration>
+            <Optimizations>
+              <OptimizationLevel Value="4"/>
+            </Optimizations>
+          </CodeGeneration>
+          <Linking>
+            <Debugging>
+              <GenerateDebugInfo Value="False"/>
+              <StripSymbols Value="True"/>
+            </Debugging>
+          </Linking>
+          <Other>
+            <CustomOptions Value="-dUseCThreads"/>
+            <OtherDefines Count="2">
+              <Define0 Value="UseCThreads"/>
+              <Define1 Value="DEBUG_MQTT"/>
+            </OtherDefines>
+          </Other>
+        </CompilerOptions>
+      </Item3>
     </BuildModes>
     <PublishOptions>
       <Version Value="2"/>
@@ -106,6 +139,7 @@
         <OverflowChecks Value="True"/>
       </Checks>
       <VerifyObjMethodCallValidity Value="True"/>
+      <TargetOS Value="win32"/>
     </CodeGeneration>
     <Linking>
       <Debugging>
@@ -114,7 +148,12 @@
       </Debugging>
     </Linking>
     <Other>
-      <CustomOptions Value="-dUseCThreads"/>
+      <CustomOptions Value="-dUseCThreads
+-dDEBUG_MQTT"/>
+      <OtherDefines Count="2">
+        <Define0 Value="UseCThreads"/>
+        <Define1 Value="DEBUG_MQTT"/>
+      </OtherDefines>
     </Other>
   </CompilerOptions>
   <Debugging>

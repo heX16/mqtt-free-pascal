@@ -194,6 +194,14 @@ function RemainingLength(MessageLength: integer): TRemainingLength;
 
 implementation
 
+{ ok, so this is a hack, but it works nicely. Just never use
+  a multiline argument with WRITE_DEBUG! }
+{$MACRO ON}
+{$IFDEF DEBUG_MQTT}
+{$define WRITE_DEBUG := WriteLn} // actually write something
+{$ELSE}
+{$define WRITE_DEBUG := //}      // just comment out those lines
+{$ENDIF}
 
 constructor TMQTTMessage.Create(const topic_: ansistring;
   const payload_: ansistring; const retain_: boolean);
@@ -254,7 +262,7 @@ function TMQTTClient.Disconnect: boolean;
 var
   Data: TBytes;
 begin
-  writeln('TMQTTClient.Disconnect');
+  WRITE_DEBUG('TMQTTClient.Disconnect');
   Result := False;
 
   SetLength(Data, 2);
@@ -283,7 +291,7 @@ end;
 ------------------------------------------------------------------------------*}
 procedure TMQTTClient.ForceDisconnect;
 begin
-  writeln('TMQTTClient.ForceDisconnect');
+  WRITE_DEBUG('TMQTTClient.ForceDisconnect');
   EnterCriticalsection(FCritThreadPtr);
   if FReadThread <> nil then
   begin
@@ -304,7 +312,7 @@ begin
   FReadThread := nil;
   LeaveCriticalsection(FCritThreadPtr);
   FisConnected := False;
-  WriteLn('TMQTTClient.OnRTTerminate: Thread.Terminated.');
+  WRITE_DEBUG('TMQTTClient.OnRTTerminate: Thread.Terminated.');
 end;
 
 function TMQTTClient.CreateMQTTThread: TMQTTReadThread;

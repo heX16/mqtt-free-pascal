@@ -98,6 +98,15 @@ implementation
 uses
   MQTT;
 
+{ ok, so this is a hack, but it works nicely. Just never use
+  a multiline argument with WRITE_DEBUG! }
+{$MACRO ON}
+{$IFDEF DEBUG_MQTT}
+{$define WRITE_DEBUG := WriteLn} // actually write something
+{$ELSE}
+{$define WRITE_DEBUG := //}      // just comment out those lines
+{$ENDIF}
+
 procedure SetBit(var Value: byte; const Index: byte; const State: boolean); inline;
 begin
   Value := (Value and ((byte(1) shl Index) xor High(byte))) or
@@ -147,8 +156,14 @@ begin
       case rxState of
         RX_START:
         begin
+          WRITE_DEBUG('TMQTTReadThread: RX_START begin...');
+
           // Make the socket connection
           FPSocket.Connect(FHostname, IntToStr(FPort));
+
+          //todo: check error code after FPSocket.Connect
+          WRITE_DEBUG('TMQTTReadThread: FPSocket.LastErrorDesc=', FPSocket.LastErrorDesc);
+          WRITE_DEBUG('TMQTTReadThread: FPSocket.LastError=', FPSocket.LastError);
 
           //  Build CONNECT message
           FH := FixedHeader(MQTT.CONNECT, 0, 0, 0);
@@ -160,30 +175,30 @@ begin
           RL := RemainingLength(Length(VH) + Length(Payload));
           Data := BuildCommand(FH, RL, VH, Payload);
 
-          writeln('RX_START: ', FPSocket.LastErrorDesc);
-          writeln('RX_START: ', FPSocket.LastError);
-
           //sleep(1);
 
           // Send CONNECT message
           while not self.Terminated do
           begin
-            writeln('loop...');
+            WRITE_DEBUG('TMQTTReadThread: Send CONNECT message...');
             SocketWrite(Data);
             error := FPSocket.LastError;
-            writeln('RX_START: ', FPSocket.LastErrorDesc);
-            writeln('RX_START: ', error);
+            //WRITE_DEBUG('TMQTTReadThread: FPSocket.LastErrorDesc=', FPSocket.LastErrorDesc);
+            //WRITE_DEBUG('TMQTTReadThread: FPSocket.LastError=', error);
             if error = 0 then
             begin
+              WRITE_DEBUG('TMQTTReadThread: RX_START end.');
               rxState := RX_FIXED_HEADER;
               break;
             end
             else
             begin
+              //todo: remove magic const!  (? WSANO_ERROR?, WSAWOULDBLOCK, WSAINPROGRESS )
               if error = 110 then
               begin
                 continue;
               end;
+              WRITE_DEBUG('TMQTTReadThread: RX_START error!');
               rxState := RX_ERROR;
               break;
             end;

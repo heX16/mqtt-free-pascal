@@ -97,7 +97,8 @@
       </Debugging>
     </Linking>
     <Other>
-      <CustomOptions Value="-dUseCThreads"/>
+      <CustomOptions Value="-dUseCThreads
+-dDEBUG_MQTT"/>
     </Other>
   </CompilerOptions>
   <Debugging>
