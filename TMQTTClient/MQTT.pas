@@ -60,6 +60,11 @@ type
     Reserved15   // 15 Reserved
     );
 
+  (*todo: all string is UTF-8! (see doc: mqtt-v3.1.1 part 1.5.3).
+  ansistring -> MQTTString
+  MQTTString = UTF8String;
+  *)
+
   // The message class definition
   TMQTTMessage = class
   private
@@ -108,7 +113,6 @@ type
     FReadThread: TMQTTReadThread;
     FMessageID: integer;
     FisConnected: boolean;
-    FReaderThreadRunning: boolean;
 
     FConnAckEvent: TConnAckEvent;
     FPublishEvent: TPublishEvent;
@@ -117,6 +121,7 @@ type
     FUnSubAckEvent: TUnSubAckEvent;
 
     FCritical: TRTLCriticalSection;
+    FCritThreadPtr: TRTLCriticalSection;
     FMessageQueue: TQueue;
     FMessageAckQueue: TQueue;
 
@@ -214,24 +219,29 @@ end;
   protocol. Check for a CONACK message to verify successful connection.
 ------------------------------------------------------------------------------*}
 procedure TMQTTClient.Connect;
+var newThread: TMQTTReadThread;
 begin
-  if FReaderThreadRunning = False then
+  if not isConnected then
   begin
+    newThread := CreateMQTTThread();
+    newThread.OnConnAck := @OnRTConnAck;
+    newThread.OnPublish := @OnRTPublish;
+    newThread.OnPublish := @OnRTPublish;
+    newThread.OnPingResp := @OnRTPingResp;
+    newThread.OnSubAck := @OnRTSubAck;
+    newThread.OnTerminate := @OnRTTerminate;
+
+    EnterCriticalsection(FCritThreadPtr);
     // Create and start RX thread
     if FReadThread <> nil then
     begin
       FReadThread.OnTerminate := nil;
-      FreeAndNil(FReadThread);
+      FReadThread.Terminate;
+      FReadThread := nil;
     end;
-    FReadThread := CreateMQTTThread();
-    FReadThread.OnConnAck := @OnRTConnAck;
-    FReadThread.OnPublish := @OnRTPublish;
-    FReadThread.OnPublish := @OnRTPublish;
-    FReadThread.OnPingResp := @OnRTPingResp;
-    FReadThread.OnSubAck := @OnRTSubAck;
-    FReadThread.OnTerminate := @OnRTTerminate;
-    FReadThread.Start;
-    FReaderThreadRunning := True;
+    FReadThread := newThread;
+    LeaveCriticalsection(FCritThreadPtr);
+    newThread.Start;
   end;
 end;
 
@@ -253,15 +263,15 @@ begin
   if SocketWrite(Data) then
   begin
     FisConnected := False;
+    EnterCriticalsection(FCritThreadPtr);
     if FReadThread <> nil then
     begin
       //todo: collect all terminate code (connect, Disconnect, ForceDisconnect) to one point
       FReadThread.OnTerminate := nil;
       FReadThread.Terminate;
       FReadThread := nil;
-      //todo: the probability of a hang?
-      //FReadThread.waitFor;
     end;
+    LeaveCriticalsection(FCritThreadPtr);
     Result := True;
   end
   else
@@ -274,12 +284,14 @@ end;
 procedure TMQTTClient.ForceDisconnect;
 begin
   writeln('TMQTTClient.ForceDisconnect');
+  EnterCriticalsection(FCritThreadPtr);
   if FReadThread <> nil then
   begin
     FReadThread.OnTerminate := nil;
     FReadThread.Terminate;
     FReadThread := nil;
   end;
+  LeaveCriticalsection(FCritThreadPtr);
   FisConnected := False;
 end;
 
@@ -288,9 +300,9 @@ end;
 ------------------------------------------------------------------------------*}
 procedure TMQTTClient.OnRTTerminate(Sender: TObject);
 begin
-  //todo: on terminating - need disable this object
+  EnterCriticalsection(FCritThreadPtr);
   FReadThread := nil;
-  FReaderThreadRunning := False;
+  LeaveCriticalsection(FCritThreadPtr);
   FisConnected := False;
   WriteLn('TMQTTClient.OnRTTerminate: Thread.Terminated.');
 end;
@@ -436,23 +448,30 @@ begin
   FHostname := Hostname;
   FPort := Port;
   FMessageID := 1;
-  FReaderThreadRunning := False;
   InitCriticalSection(FCritical);
+  InitCriticalSection(FCritThreadPtr);
   FMessageQueue := TQueue.Create;
   FMessageAckQueue := TQueue.Create;
 end;
 
 destructor TMQTTClient.Destroy;
 begin
-  if (isConnected) and (FReadThread <> nil) then
+  EnterCriticalsection(FCritThreadPtr);
+  if (FReadThread <> nil) then
   begin
+    FReadThread.OnTerminate:=nil;
+    FisConnected := False;
     FReadThread.Terminate;
     FReadThread.WaitFor;
+    FReadThread := nil;
     //note: free is not needed - the FreeOnTerminate mode is enabled
   end;
+  EnterCriticalsection(FCritThreadPtr);
+
   FMessageQueue.Free;
   FMessageAckQueue.Free;
   DoneCriticalSection(FCritical);
+  DoneCriticalSection(FCritThreadPtr);
   inherited;
 end;
 
@@ -489,7 +508,11 @@ begin
   Result := False;
   // Returns whether the Data was successfully written to the socket.
   if isConnected then
+  begin
+    EnterCriticalsection(FCritThreadPtr);
     Result := FReadThread.SocketWrite(Data);
+    LeaveCriticalsection(FCritThreadPtr);
+  end;
 end;
 
 function StrToBytes(str: ansistring; perpendLength: boolean): TUTF8Text;
