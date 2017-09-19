@@ -766,7 +766,7 @@ begin
     // Protected code.
     EnterCriticalSection(FCritical);
     try
-      FMessageAckQueue.Push(TMQTTMessageAck.Create(SUBACK, MessageID, 0, 0));
+      FMessageAckQueue.Push(TMQTTMessageAck.Create(UNSUBACK, MessageID, 0, 0));
     finally
       LeaveCriticalSection(FCritical);
     end;
