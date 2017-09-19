@@ -237,6 +237,7 @@ begin
     newThread.OnPublish := @OnRTPublish;
     newThread.OnPingResp := @OnRTPingResp;
     newThread.OnSubAck := @OnRTSubAck;
+    newThread.OnUnSubAck := @OnRTUnSubAck;
     newThread.OnTerminate := @OnRTTerminate;
 
     EnterCriticalsection(FCritThreadPtr);
