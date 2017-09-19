@@ -41,23 +41,23 @@ uses
 type
   //  Message type. 4 Bit unsigned.
   TMQTTMessageType = (
-    Reserved0,   //  0 Reserved
-    CONNECT,     //  1 Client request to connect to Broker
-    CONNACK,     //  2 Connect Acknowledgment
+    Reserved0 = 0,    // Reserved
+    CONNECT = 1,      // Client request to connect to Broker
+    CONNACK = 2,      // Connect Acknowledgment
     // PUBLISH Control Packet is sent from a Client to a Server or from Server to a Client to transport an Application Message.
-    PUBLISH,     //  3 Publish message
-    PUBACK,      //  4 Publish Acknowledgment
-    PUBREC,      //  5 Publish Received (assured delivery part 1)
-    PUBREL,      //  6 Publish Release (assured delivery part 2)
-    PUBCOMP,     //  7 Publish Complete (assured delivery part 3)
-    SUBSCRIBE,   //  8 Client Subscribe request
-    SUBACK,      //  9 Subscribe Acknowledgment
-    UNSUBSCRIBE, // 10 Client Unsubscribe request
-    UNSUBACK,    // 11 Unsubscribe Acknowledgment
-    PINGREQ,     // 12 PING Request
-    PINGRESP,    // 13 PING Response
-    DISCONNECT,  // 14 Client is Disconnecting
-    Reserved15   // 15 Reserved
+    PUBLISH = 3,      // Publish message
+    PUBACK = 4,       // Publish Acknowledgment
+    PUBREC = 5,       // Publish Received (assured delivery part 1)
+    PUBREL = 6,       // Publish Release (assured delivery part 2)
+    PUBCOMP = 7,      // Publish Complete (assured delivery part 3)
+    SUBSCRIBE = 8,    // Client Subscribe request
+    SUBACK = 9,       // Subscribe Acknowledgment
+    UNSUBSCRIBE = 10, // Client Unsubscribe request
+    UNSUBACK = 11,    // Unsubscribe Acknowledgment
+    PINGREQ = 12,     // PING Request
+    PINGRESP = 13,    // PING Response
+    DISCONNECT = 14,  // Client is Disconnecting
+    Reserved15 = 15   // Reserved
     );
 
   (*todo: all string is UTF-8! (see doc: mqtt-v3.1.1 part 1.5.3).
@@ -272,10 +272,10 @@ begin
   if SocketWrite(Data) then
   begin
     FisConnected := False;
+    //todo: collect all terminate code (connect, Disconnect, ForceDisconnect) to one point
     EnterCriticalsection(FCritThreadPtr);
     if FReadThread <> nil then
     begin
-      //todo: collect all terminate code (connect, Disconnect, ForceDisconnect) to one point
       FReadThread.OnTerminate := nil;
       FReadThread.Terminate;
       FReadThread := nil;
@@ -309,10 +309,10 @@ end;
 ------------------------------------------------------------------------------*}
 procedure TMQTTClient.OnRTTerminate(Sender: TObject);
 begin
+  FisConnected := False;
   EnterCriticalsection(FCritThreadPtr);
   FReadThread := nil;
   LeaveCriticalsection(FCritThreadPtr);
-  FisConnected := False;
   WRITE_DEBUG('TMQTTClient.OnRTTerminate: Thread.Terminated.');
 end;
 

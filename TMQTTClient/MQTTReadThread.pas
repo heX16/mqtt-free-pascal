@@ -266,7 +266,7 @@ end;
 
 procedure TMQTTReadThread.HandleData;
 var
-  MessageType: byte;
+  MessageType: TMQTTMessageType;
   DataLen: integer;
   QoS: integer;
   Retain: boolean;
@@ -275,11 +275,10 @@ var
   ResponseVH: TBytes;
   ConnectReturn: integer;
 begin
-  if (CurrentMessage.FixedHeader <> 0) then
-  begin
-    MessageType := CurrentMessage.FixedHeader shr 4;
+  MessageType := TMQTTMessageType(CurrentMessage.FixedHeader shr 4);
 
-    if (MessageType = Ord(MQTT.CONNACK)) then
+  case MessageType of
+  MQTT.CONNACK:
     begin
       // Check if we were given a Connect Return Code.
       // Any return code except 0 is an Error
@@ -290,54 +289,50 @@ begin
         if Assigned(OnConnAck) then
           OnConnAck(Self, ConnectReturn);
       end;
-    end
-    else
-      if (MessageType = Ord(MQTT.PUBLISH)) then
+    end;
+  MQTT.PUBLISH:
+    begin
+      Retain := GetBit(CurrentMessage.FixedHeader, 0);
+      // Read the Length Bytes
+      DataLen := BytesToStrLength(Copy(CurrentMessage.Data, 0, 2));
+      // Get the Topic
+      SetString(Topic, PChar(@CurrentMessage.Data[2]), DataLen);
+      // Get the Payload
+      if Length(CurrentMessage.Data) - 2 - DataLen <= 0 then
+        Payload:='' else
+        SetString(Payload, PChar(@CurrentMessage.Data[2 + DataLen]),
+          (Length(CurrentMessage.Data) - 2 - DataLen));
+      if Assigned(OnPublish) then
+        OnPublish(Self, Topic, Payload, retain);
+    end;
+  MQTT.SUBACK:
+    begin
+      // Reading the Message ID
+      ResponseVH := Copy(CurrentMessage.Data, 0, 2);
+      DataLen := BytesToStrLength(ResponseVH);
+      // Next Read the Granted QoS
+      QoS := 0;
+      if (Length(CurrentMessage.Data) - 2) > 0 then
       begin
-        Retain := GetBit(CurrentMessage.FixedHeader, 0);
-        // Read the Length Bytes
-        DataLen := BytesToStrLength(Copy(CurrentMessage.Data, 0, 2));
-        // Get the Topic
-        SetString(Topic, PChar(@CurrentMessage.Data[2]), DataLen);
-        // Get the Payload
-        if Length(CurrentMessage.Data) - 2 - DataLen <= 0 then
-          Payload:='' else
-          SetString(Payload, PChar(@CurrentMessage.Data[2 + DataLen]),
-            (Length(CurrentMessage.Data) - 2 - DataLen));
-        if Assigned(OnPublish) then
-          OnPublish(Self, Topic, Payload, retain);
-      end
-      else
-        if (MessageType = Ord(MQTT.SUBACK)) then
-        begin
-          // Reading the Message ID
-          ResponseVH := Copy(CurrentMessage.Data, 0, 2);
-          DataLen := BytesToStrLength(ResponseVH);
-          // Next Read the Granted QoS
-          QoS := 0;
-          if (Length(CurrentMessage.Data) - 2) > 0 then
-          begin
-            ResponseVH := Copy(CurrentMessage.Data, 2, 1);
-            QoS := ResponseVH[0];
-          end;
-          if Assigned(OnSubAck) then
-            OnSubAck(Self, DataLen, QoS);
-        end
-        else
-          if (MessageType = Ord(MQTT.UNSUBACK)) then
-          begin
-            // Read the Message ID for the event handler
-            ResponseVH := Copy(CurrentMessage.Data, 0, 2);
-            DataLen := BytesToStrLength(ResponseVH);
-            if Assigned(OnUnSubAck) then
-              OnUnSubAck(Self, DataLen);
-          end
-          else
-            if (MessageType = Ord(MQTT.PINGRESP)) then
-            begin
-              if Assigned(OnPingResp) then
-                OnPingResp(Self);
-            end;
+        ResponseVH := Copy(CurrentMessage.Data, 2, 1);
+        QoS := ResponseVH[0];
+      end;
+      if Assigned(OnSubAck) then
+        OnSubAck(Self, DataLen, QoS);
+    end;
+  MQTT.UNSUBACK:
+    begin
+      // Read the Message ID for the event handler
+      ResponseVH := Copy(CurrentMessage.Data, 0, 2);
+      DataLen := BytesToStrLength(ResponseVH);
+      if Assigned(OnUnSubAck) then
+        OnUnSubAck(Self, DataLen);
+    end;
+  MQTT.PINGRESP:
+    begin
+      if Assigned(OnPingResp) then
+        OnPingResp(Self);
+    end;
   end;
 end;
 
