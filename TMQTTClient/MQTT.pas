@@ -147,14 +147,14 @@ type
     // virtual creator for Thread class.
     // 'Virtual Constructor' (aka 'Factory Method') - you can overload the TMQTTReadThread class.
     function CreateMQTTThread: TMQTTReadThread; virtual;
-    procedure TerminateThread(waitThreadEnd: boolean = false);
+    procedure TerminateThread(waitThreadEnd: boolean = False);
 
   public
     function isConnected: boolean;
     procedure Connect;
     function Disconnect: boolean;
     procedure ForceDisconnect;
-    function Publish(Topic, sPayload: ansistring; Retain: boolean = false): boolean;
+    function Publish(Topic, sPayload: ansistring; Retain: boolean = False): boolean;
     function Subscribe(Topic: ansistring): integer;
     function Unsubscribe(Topic: ansistring): integer;
     function PingReq: boolean;
@@ -200,9 +200,9 @@ implementation
   a multiline argument with WRITE_DEBUG! }
 {$MACRO ON}
 {$IFDEF DEBUG_MQTT}
-{$define WRITE_DEBUG := WriteLn} // actually write something
+{$define WRITE_DEBUG := WriteLn}// actually write something
 {$ELSE}
-{$define WRITE_DEBUG := //}      // just comment out those lines
+{$define WRITE_DEBUG := //}// just comment out those lines
 {$ENDIF}
 
 constructor TMQTTMessage.Create(const topic_: ansistring;
@@ -229,7 +229,8 @@ end;
   protocol. Check for a CONACK message to verify successful connection.
 ------------------------------------------------------------------------------*}
 procedure TMQTTClient.Connect;
-var newThread: TMQTTReadThread;
+var
+  newThread: TMQTTReadThread;
 begin
   if not isConnected then
   begin
@@ -307,7 +308,9 @@ begin
   Result := TMQTTReadThread.Create(FHostname, FPort);
 end;
 
-procedure TMQTTClient.TerminateThread(waitThreadEnd: boolean = false);
+procedure TMQTTClient.TerminateThread(waitThreadEnd: boolean = False);
+var
+  p: TMQTTReadThread;
 begin
   if not waitThreadEnd then
   begin
@@ -326,23 +329,31 @@ begin
     finally
       LeaveCriticalsection(FCritThreadPtr);
     end;
-  end else
+  end
+  else
   begin
     // slow terminate
     try
+      p := nil;
       EnterCriticalsection(FCritThreadPtr);
-      if FReadThread<>nil then
+      if FReadThread <> nil then
       begin
         FReadThread.OnTerminate := nil;
-        FReadThread.FreeOnTerminate := false;
+        FReadThread.FreeOnTerminate := False;
+        // capture pointer to thread
+        p := FReadThread;
+        FReadThread := nil;
       end;
     finally
       LeaveCriticalsection(FCritThreadPtr);
     end;
-    FReadThread.Terminate;
-    FReadThread.WaitFor;
-    // manual free (because the 'FreeOnTerminate' is disabled)
-    FreeAndNil(FReadThread);
+    if p <> nil then
+    begin
+      p.Terminate;
+      p.WaitFor;
+      // manual free (because the 'FreeOnTerminate' is disabled)
+      FreeAndNil(p);
+    end;
   end;
 end;
 
@@ -378,7 +389,8 @@ end;
   @param Retain   Should this message be retained for clients connecting subsequently
   @return Returns whether the Data was written successfully to the socket.
 ------------------------------------------------------------------------------*}
-function TMQTTClient.Publish(Topic, sPayload: ansistring; Retain: boolean = false): boolean;
+function TMQTTClient.Publish(Topic, sPayload: ansistring;
+  Retain: boolean = False): boolean;
 var
   Data: TBytes;
   FH: byte;
@@ -490,7 +502,7 @@ end;
 
 destructor TMQTTClient.Destroy;
 begin
-  TerminateThread(true);
+  TerminateThread(True);
   try
     EnterCriticalsection(FCritical);
     FMessageQueue.Free;
