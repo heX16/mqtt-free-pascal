@@ -128,7 +128,6 @@ begin
   FClientID := 'dMQTTClientx' + IntToStr(Random(1000) + 1);
   FHostname := Hostname;
   FPort := Port;
-  FreeOnTerminate := True;
 end;
 
 procedure TMQTTReadThread.Execute;

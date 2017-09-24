@@ -120,6 +120,7 @@ type
     FSubAckEvent: TSubAckEvent;
     FUnSubAckEvent: TUnSubAckEvent;
 
+    //todo: rename: FCritical->FCritQueuePtr
     FCritical: TRTLCriticalSection;
     FCritThreadPtr: TRTLCriticalSection;
     FMessageQueue: TQueue;
@@ -146,6 +147,7 @@ type
     // virtual creator for Thread class.
     // 'Virtual Constructor' (aka 'Factory Method') - you can overload the TMQTTReadThread class.
     function CreateMQTTThread: TMQTTReadThread; virtual;
+    procedure TerminateThread(waitThreadEnd: boolean = false);
 
   public
     function isConnected: boolean;
@@ -231,6 +233,7 @@ var newThread: TMQTTReadThread;
 begin
   if not isConnected then
   begin
+    // Create RX thread
     newThread := CreateMQTTThread();
     newThread.OnConnAck := @OnRTConnAck;
     newThread.OnPublish := @OnRTPublish;
@@ -239,18 +242,18 @@ begin
     newThread.OnSubAck := @OnRTSubAck;
     newThread.OnUnSubAck := @OnRTUnSubAck;
     newThread.OnTerminate := @OnRTTerminate;
+    newThread.FreeOnTerminate := True;
 
-    EnterCriticalsection(FCritThreadPtr);
-    // Create and start RX thread
-    if FReadThread <> nil then
-    begin
-      FReadThread.OnTerminate := nil;
-      FReadThread.Terminate;
-      FReadThread := nil;
+    TerminateThread();
+
+    try
+      EnterCriticalsection(FCritThreadPtr);
+      FReadThread := newThread;
+      // start thread
+      FReadThread.Start;
+    finally
+      LeaveCriticalsection(FCritThreadPtr);
     end;
-    FReadThread := newThread;
-    LeaveCriticalsection(FCritThreadPtr);
-    newThread.Start;
   end;
 end;
 
@@ -271,16 +274,7 @@ begin
   Data[1] := 0;
   if SocketWrite(Data) then
   begin
-    FisConnected := False;
-    //todo: collect all terminate code (connect, Disconnect, ForceDisconnect) to one point
-    EnterCriticalsection(FCritThreadPtr);
-    if FReadThread <> nil then
-    begin
-      FReadThread.OnTerminate := nil;
-      FReadThread.Terminate;
-      FReadThread := nil;
-    end;
-    LeaveCriticalsection(FCritThreadPtr);
+    TerminateThread();
     Result := True;
   end
   else
@@ -293,15 +287,7 @@ end;
 procedure TMQTTClient.ForceDisconnect;
 begin
   WRITE_DEBUG('TMQTTClient.ForceDisconnect');
-  EnterCriticalsection(FCritThreadPtr);
-  if FReadThread <> nil then
-  begin
-    FReadThread.OnTerminate := nil;
-    FReadThread.Terminate;
-    FReadThread := nil;
-  end;
-  LeaveCriticalsection(FCritThreadPtr);
-  FisConnected := False;
+  TerminateThread();
 end;
 
 {*------------------------------------------------------------------------------
@@ -319,6 +305,45 @@ end;
 function TMQTTClient.CreateMQTTThread: TMQTTReadThread;
 begin
   Result := TMQTTReadThread.Create(FHostname, FPort);
+end;
+
+procedure TMQTTClient.TerminateThread(waitThreadEnd: boolean = false);
+begin
+  if not waitThreadEnd then
+  begin
+    // fast terminate
+    try
+      EnterCriticalsection(FCritThreadPtr);
+      if FReadThread <> nil then
+      begin
+        FisConnected := False;
+        FReadThread.OnTerminate := nil;
+        FReadThread.Terminate;
+        // call 'free' is not needed - the 'FreeOnTerminate' mode is enabled
+        // just drom terminating thread
+        FReadThread := nil;
+      end
+    finally
+      LeaveCriticalsection(FCritThreadPtr);
+    end;
+  end else
+  begin
+    // slow terminate
+    try
+      EnterCriticalsection(FCritThreadPtr);
+      if FReadThread<>nil then
+      begin
+        FReadThread.OnTerminate := nil;
+        FReadThread.FreeOnTerminate := false;
+      end;
+    finally
+      LeaveCriticalsection(FCritThreadPtr);
+    end;
+    FReadThread.Terminate;
+    FReadThread.WaitFor;
+    // manual free (because the 'FreeOnTerminate' is disabled)
+    FreeAndNil(FReadThread);
+  end;
 end;
 
 {*------------------------------------------------------------------------------
@@ -465,20 +490,14 @@ end;
 
 destructor TMQTTClient.Destroy;
 begin
-  EnterCriticalsection(FCritThreadPtr);
-  if (FReadThread <> nil) then
-  begin
-    FReadThread.OnTerminate:=nil;
-    FisConnected := False;
-    FReadThread.Terminate;
-    FReadThread.WaitFor;
-    FReadThread := nil;
-    //note: free is not needed - the FreeOnTerminate mode is enabled
+  TerminateThread(true);
+  try
+    EnterCriticalsection(FCritical);
+    FMessageQueue.Free;
+    FMessageAckQueue.Free;
+  finally
+    LeaveCriticalsection(FCritical);
   end;
-  EnterCriticalsection(FCritThreadPtr);
-
-  FMessageQueue.Free;
-  FMessageAckQueue.Free;
   DoneCriticalSection(FCritical);
   DoneCriticalSection(FCritThreadPtr);
   inherited;
@@ -511,8 +530,7 @@ begin
 end;
 
 function TMQTTClient.SocketWrite(Data: TBytes): boolean;
-var
-  sentData: integer;
+//todo: DEL: var sentData: integer;
 begin
   Result := False;
   // Returns whether the Data was successfully written to the socket.
