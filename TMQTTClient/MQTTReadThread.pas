@@ -96,16 +96,29 @@ type
 implementation
 
 uses
+  {$IFDEF DEBUG_MQTT_LCLLOG}
+  LCLProc, // DbgOutThreadLog
+  {$ENDIF DEBUG_MQTT_LCLLOG}
   MQTT;
 
+{$IFDEF DEBUG_MQTT_LCLLOG}
+procedure WRITE_DEBUG(str: AnsiString);
+begin
+  DbgOutThreadLog(TimeToStr(Now()) + '[' + IntToStr(GetTickCount64()) + ']' + str + LineEnding);
+end;
+{$ELSE}
 { ok, so this is a hack, but it works nicely. Just never use
   a multiline argument with WRITE_DEBUG! }
-{$MACRO ON}
 {$IFDEF DEBUG_MQTT}
-{$define WRITE_DEBUG := WriteLn} // actually write something
+procedure WRITE_DEBUG(str: AnsiString);
+begin
+  Writeln(TimeToStr(Now()) + '[' + IntToStr(GetTickCount64()) + ']' + str + LineEnding);
+end;
 {$ELSE}
-{$define WRITE_DEBUG := //}      // just comment out those lines
+{$MACRO ON}
+{$define WRITE_DEBUG := //}// just comment out those lines
 {$ENDIF}
+{$ENDIF DEBUG_MQTT_LCLLOG}
 
 procedure SetBit(var Value: byte; const Index: byte; const State: boolean); inline;
 begin
@@ -161,8 +174,8 @@ begin
           FPSocket.Connect(FHostname, IntToStr(FPort));
 
           //todo: check error code after FPSocket.Connect
-          WRITE_DEBUG('TMQTTReadThread: FPSocket.LastErrorDesc=', FPSocket.LastErrorDesc);
-          WRITE_DEBUG('TMQTTReadThread: FPSocket.LastError=', FPSocket.LastError);
+          WRITE_DEBUG('TMQTTReadThread: FPSocket.LastErrorDesc='+FPSocket.LastErrorDesc);
+          WRITE_DEBUG('TMQTTReadThread: FPSocket.LastError='+IntToStr(FPSocket.LastError));
 
           //  Build CONNECT message
           FH := FixedHeader(MQTT.CONNECT, 0, 0, 0);

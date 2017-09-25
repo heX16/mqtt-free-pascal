@@ -123,7 +123,7 @@ type
     //todo: rename: FCritical->FCritQueuePtr
     FCritical: TRTLCriticalSection;
     FCritThreadPtr: TRTLCriticalSection;
-    FMessageQueue: TQueue;
+
     FMessageAckQueue: TQueue;
 
     // Gets a next Message ID and increases the Message ID Increment
@@ -150,6 +150,9 @@ type
     procedure TerminateThread(waitThreadEnd: boolean = False);
 
   public
+    //todo: move back!
+    FMessageQueue: TQueue;
+
     function isConnected: boolean;
     procedure Connect;
     function Disconnect: boolean;
@@ -196,14 +199,26 @@ function RemainingLength(MessageLength: integer): TRemainingLength;
 
 implementation
 
+{$IFDEF DEBUG_MQTT_LCLLOG}
+uses LCLProc; // DbgOutThreadLog
+
+procedure WRITE_DEBUG(str: AnsiString);
+begin
+  DbgOutThreadLog(TimeToStr(Now()) + '[' + IntToStr(GetTickCount64()) + ']' + str + LineEnding);
+end;
+{$ELSE}
 { ok, so this is a hack, but it works nicely. Just never use
   a multiline argument with WRITE_DEBUG! }
-{$MACRO ON}
 {$IFDEF DEBUG_MQTT}
-{$define WRITE_DEBUG := WriteLn}// actually write something
+procedure WRITE_DEBUG(str: AnsiString);
+begin
+  Writeln(TimeToStr(Now()) + '[' + IntToStr(GetTickCount64()) + ']' + str + LineEnding);
+end;
 {$ELSE}
+{$MACRO ON}
 {$define WRITE_DEBUG := //}// just comment out those lines
 {$ENDIF}
+{$ENDIF DEBUG_MQTT_LCLLOG}
 
 constructor TMQTTMessage.Create(const topic_: ansistring;
   const payload_: ansistring; const retain_: boolean);
@@ -267,12 +282,13 @@ function TMQTTClient.Disconnect: boolean;
 var
   Data: TBytes;
 begin
-  WRITE_DEBUG('TMQTTClient.Disconnect');
+  WRITE_DEBUG('TMQTTClient.Disconnect begin');
   Result := False;
 
   SetLength(Data, 2);
   Data[0] := FixedHeader(MQTT.DISCONNECT, 0, 0, 0);
   Data[1] := 0;
+  WRITE_DEBUG('TMQTTClient.Disconnect SocketWrite');
   if SocketWrite(Data) then
   begin
     TerminateThread();
@@ -280,6 +296,7 @@ begin
   end
   else
     Result := False;
+  WRITE_DEBUG('TMQTTClient.Disconnect end');
 end;
 
 {*------------------------------------------------------------------------------
@@ -312,6 +329,7 @@ procedure TMQTTClient.TerminateThread(waitThreadEnd: boolean = False);
 var
   p: TMQTTReadThread;
 begin
+  WRITE_DEBUG('TMQTTClient.TerminateThread begin ');
   if not waitThreadEnd then
   begin
     // fast terminate
@@ -338,6 +356,7 @@ begin
       EnterCriticalsection(FCritThreadPtr);
       if FReadThread <> nil then
       begin
+        WRITE_DEBUG('TMQTTClient.TerminateThread FReadThread.OnTerminate := nil ');
         FReadThread.OnTerminate := nil;
         FReadThread.FreeOnTerminate := False;
         // capture pointer to thread
@@ -349,12 +368,14 @@ begin
     end;
     if p <> nil then
     begin
+      WRITE_DEBUG('TMQTTClient.TerminateThread p.Terminate');
       p.Terminate;
       p.WaitFor;
       // manual free (because the 'FreeOnTerminate' is disabled)
       FreeAndNil(p);
     end;
   end;
+  WRITE_DEBUG('TMQTTClient.TerminateThread end ');
 end;
 
 {*------------------------------------------------------------------------------
