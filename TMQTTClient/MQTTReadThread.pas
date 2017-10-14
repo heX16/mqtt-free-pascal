@@ -364,7 +364,6 @@ var
 begin
   Result := False;
   // Returns whether the Data was successfully written to the socket.
-
   while not FPSocket.CanWrite(0) do
   begin
     sleep(100);

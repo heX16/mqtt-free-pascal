@@ -152,6 +152,8 @@ type
   public
     //todo: move back!
     FMessageQueue: TQueue;
+    EventEnabled: boolean;
+    QueueEnabled: boolean;
 
     function isConnected: boolean;
     procedure Connect;
@@ -509,6 +511,8 @@ constructor TMQTTClient.Create(Hostname: ansistring; Port: integer);
 begin
   inherited Create;
   Randomize;
+  EventEnabled:=false;
+  QueueEnabled:=true;
 
   // Create a Default ClientID as a default. Can be overridden with TMQTTClient.ClientID any time before connection.
   FClientID := 'dMQTTClient' + IntToStr(Random(1000) + 1);
@@ -734,11 +738,11 @@ begin
   begin
     FisConnected := True;
   end;
-  if Assigned(OnConnAck) then
+  if Assigned(OnConnAck) and EventEnabled then
   begin
     OnConnAck(Self, ReturnCode);
-  end
-  else
+  end;
+  if QueueEnabled then
   begin
     // Protected code.
     EnterCriticalSection(FCritical);
@@ -752,11 +756,11 @@ end;
 
 procedure TMQTTClient.OnRTPingResp(Sender: TObject);
 begin
-  if Assigned(OnPingResp) then
+  if Assigned(OnPingResp) and EventEnabled then
   begin
     OnPingResp(Self);
-  end
-  else
+  end;
+  if QueueEnabled then
   begin
     // Protected code.
     EnterCriticalSection(FCritical);
@@ -771,11 +775,11 @@ end;
 procedure TMQTTClient.OnRTPublish(Sender: TObject; topic, payload: ansistring;
   retain: boolean);
 begin
-  if Assigned(OnPublish) then
+  if Assigned(OnPublish) and EventEnabled then
   begin
     OnPublish(Self, topic, payload, retain);
-  end
-  else
+  end;
+  if QueueEnabled then
   begin
     // Protected code.
     EnterCriticalSection(FCritical);
@@ -790,11 +794,11 @@ end;
 procedure TMQTTClient.OnRTSubAck(Sender: TObject; MessageID: integer;
   GrantedQoS: integer);
 begin
-  if Assigned(OnSubAck) then
+  if Assigned(OnSubAck) and EventEnabled then
   begin
     OnSubAck(Self, MessageID, GrantedQoS);
-  end
-  else
+  end;
+  if QueueEnabled then
   begin
     // Protected code.
     EnterCriticalSection(FCritical);
@@ -809,11 +813,11 @@ end;
 
 procedure TMQTTClient.OnRTUnSubAck(Sender: TObject; MessageID: integer);
 begin
-  if Assigned(OnUnSubAck) then
+  if Assigned(OnUnSubAck) and EventEnabled then
   begin
     OnUnSubAck(Self, MessageID);
-  end
-  else
+  end;
+  if QueueEnabled then
   begin
     // Protected code.
     EnterCriticalSection(FCritical);
