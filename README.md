@@ -1,35 +1,36 @@
-mqtt-free-pascal
-================
+MQTT for Free Pascal and Lazarus
+=================================
 
-This the MQTT client code for Delphi by Jamie Ingilby with changes to make it useable in Free Pascal.
+This is not compatible fork of https://github.com/ZiCog/mqtt-free-pascal .
 
-http://jamiei.com/blog/code/mqtt-client-library-for-delphi/
+Support: Lazarus 1.8, Lazarus 1.6, Lazarus 1.2 [pruf](https://github.com/ZiCog/mqtt-free-pascal/issues/7#issuecomment-378238247).
 
 Changes:
 --------
 
-1) Rewrote the reader thread loop so as to make it simpler and faster also fixes a bug whereby the
-client would segfault if the server went down and a major bug where timeouts on rx would cause data corruption.
+1) Bugs fix
 
-2) Replaced the original client demo code with a simpler demo that does not use forms. I am using
-this in an embedded system with no display.
+2) Mem leak fix
 
-3) Changed all strings to ansi strings so that it can have topics and payloads longer than 255 bytes. 
+3) AV fix
 
-4) Also includes the parts of Ararat Synapse required to build.
+4) Remove hardcoded "writeln"
 
-To build the demo:
-------------------
+5) Remove old Synapse code
 
-    $ cd examples/embeddedApp
-    $ ./build
+6) Increased stability
 
+6) ????
 
-Running embeddedApp out of the box reqires you have access to test.mosquitto.org.
+7) PROFIT!
 
-TODO
-----
+Dependency
+-----------
+[Synapse 40.1](http://synapse.ararat.cz/doku.php/download) [see](https://github.com/ZiCog/mqtt-free-pascal/issues/7#issuecomment-378150764)
 
-
-
-
+Authors
+--------
+[Jamie Ingilby](http://jamiei.com/blog/code/mqtt-client-library-for-delphi/)
+@ZiCog (https://github.com/ZiCog)
+@danieljabailey (https://github.com/danieljabailey)
+@heX (https://hex.name)
