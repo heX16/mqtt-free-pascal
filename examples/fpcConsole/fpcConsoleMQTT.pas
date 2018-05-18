@@ -31,7 +31,7 @@ type
     procedure OnPingResp(Sender: TObject);
     procedure OnSubAck(Sender: TObject; MessageID: integer; GrantedQoS: integer);
     procedure OnUnSubAck(Sender: TObject);
-    procedure OnPublish(Sender: TObject; topic, payload: ansistring; isRetain: boolean);
+    procedure OnMessage(Sender: TObject; topic, payload: ansistring; isRetain: boolean);
 
     procedure OnTimerTick(Sender: TObject);
     procedure DoRun; override;
@@ -84,11 +84,11 @@ begin
   SyncCode.Leave;
 end;
 
-procedure TMQTTGate.OnPublish(Sender: TObject; topic, payload: ansistring;
+procedure TMQTTGate.OnMessage(Sender: TObject; topic, payload: ansistring;
   isRetain: boolean);
 begin
   SyncCode.Enter;
-  writeln('Publish', ' topic=', topic, ' payload=', payload);
+  writeln('Message', ' topic=', topic, ' payload=', payload);
   SyncCode.Leave;
 end;
 
@@ -130,8 +130,10 @@ begin
   MQTTClient := TMQTTClient.Create(MQTT_Server, 1883);
   MQTTClient.OnConnAck := @OnConnAck;
   MQTTClient.OnPingResp := @OnPingResp;
-  MQTTClient.OnPublish := @OnPublish;
+  MQTTClient.OnPublish := @OnMessage;
   MQTTClient.OnSubAck := @OnSubAck;
+  MQTTClient.QueueEnabled := false;
+  MQTTClient.EventEnabled := true;
   MQTTClient.Connect();
 
   //todo: wait 'OnConnAck'

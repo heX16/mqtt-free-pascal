@@ -73,6 +73,13 @@ type
     FRetain: boolean;
 
   public
+    (*todo: Python:
+    topic : String. topic that the message was published on.
+    payload : String/bytes the message payload.
+    qos : Integer. The message Quality of Service 0, 1 or 2.
+    retain : Boolean. If true, the message is a retained message and not fresh.
+    mid : Integer. The message id.
+    *)
     property Topic: ansistring read FTopic;
     property PayLoad: ansistring read FPayload;
     property Retain: boolean read FRetain;
@@ -98,7 +105,10 @@ type
       const messageId_: integer; const returnCode_: integer; const qos_: integer);
   end;
 
+
   TRemainingLength = array of byte;
+
+  //todo: remove this!
   TUTF8Text = array of byte;
 
   // Main object - MQTT client implementation
@@ -110,7 +120,10 @@ type
     FClientID: ansistring;
     FHostname: ansistring;
     FPort: integer;
+
+    // main background thread - using for reading
     FReadThread: TMQTTReadThread;
+
     FMessageID: integer;
     FisConnected: boolean;
 
@@ -120,7 +133,7 @@ type
     FSubAckEvent: TSubAckEvent;
     FUnSubAckEvent: TUnSubAckEvent;
 
-    //todo: rename: FCritical->FCritQueuePtr
+    //todo:! rename: FCritical->FCritQueuePtr
     FCritical: TRTLCriticalSection;
     FCritThreadPtr: TRTLCriticalSection;
 
@@ -150,12 +163,14 @@ type
     procedure TerminateThread(waitThreadEnd: boolean = False);
 
   public
-    //todo: move back!
+    //todo:! move back!
     FMessageQueue: TQueue;
+
     EventEnabled: boolean;
     QueueEnabled: boolean;
 
     function isConnected: boolean;
+    //todo: ? Python: host, port=1883, keepalive=60, bind_address=""
     procedure Connect;
     function Disconnect: boolean;
     procedure ForceDisconnect;
@@ -165,11 +180,16 @@ type
     function PingReq: boolean;
     function getMessage: TMQTTMessage;
     function getMessageAck: TMQTTMessageAck;
+
+    //todo: ? Python: client_id="", clean_session=True, userdata=None
     constructor Create(Hostname: ansistring; Port: integer); overload;
     destructor Destroy; override;
 
     property ClientID: ansistring read FClientID write FClientID;
+
+    //
     property OnConnAck: TConnAckEvent read FConnAckEvent write FConnAckEvent;
+
     property OnPublish: TPublishEvent read FPublishEvent write FPublishEvent;
     property OnPingResp: TPingRespEvent read FPingRespEvent write FPingRespEvent;
     property OnSubAck: TSubAckEvent read FSubAckEvent write FSubAckEvent;

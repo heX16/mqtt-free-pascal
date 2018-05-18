@@ -53,8 +53,11 @@ type
   TUTF8Text = array of byte;
 
   TConnAckEvent = procedure(Sender: TObject; ReturnCode: integer) of object;
+
+  //todo: Sender: TObject; msg: TMQTTMessage; userdata: Pointer
   TPublishEvent = procedure(Sender: TObject; topic, payload: ansistring;
     retain: boolean) of object;
+
   TPingRespEvent = procedure(Sender: TObject) of object;
   TSubAckEvent = procedure(Sender: TObject; MessageID: integer;
     GrantedQoS: integer) of object;
