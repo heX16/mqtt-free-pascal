@@ -654,7 +654,7 @@ const
   MQTT_VERSION = 3;
 var
   Qos, Retain: word;
-{todo: connect flags
+{todo: connect flags support
 7 User Name Flag
 6 Password Flag
 5 Will Retain

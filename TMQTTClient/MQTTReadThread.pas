@@ -168,9 +168,9 @@ begin
   try
     // Create a socket.
     FPSocket := TTCPBlockSocket.Create;
-    FPSocket.nonBlockMode := True;                // We really don't want sending on
+    // We really don't want sending on the socket to block our main thread.
+    FPSocket.nonBlockMode := True;
     FPSocket.NonblockSendTimeout := 1;
-    // the socket to block our main thread.
     while not self.Terminated do
     begin
       case rxState of
@@ -190,8 +190,13 @@ begin
           VH := VariableHeaderConnect(40);
           SetLength(Payload, 0);
           AppendArray(Payload, StrToBytes(FClientID, True));
-          AppendArray(Payload, StrToBytes('lwt', True));
-          AppendArray(Payload, StrToBytes(FClientID + ' died', True));
+          AppendArray(Payload, StrToBytes('lwt', True)); //todo: add normal "LWT" topic support
+          AppendArray(Payload, StrToBytes(FClientID + ' died', True)); //todo: add normal "LWT" message support
+          {todo: add support username and password (see doc: mqtt-v3.1.1 part 3.1.3.4).
+          http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html#_Toc398718031
+          Need just add to payload.
+          "These fields, if present, MUST appear in the order Client Identifier, Will Topic, Will Message, User Name, Password [MQTT-3.1.3-1]."
+          }
           RL := RemainingLength(Length(VH) + Length(Payload));
           Data := BuildCommand(FH, RL, VH, Payload);
 
