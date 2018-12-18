@@ -60,16 +60,16 @@ type
     Reserved15 = 15   // Reserved
     );
 
-  (*todo: all string is UTF-8! (see doc: mqtt-v3.1.1 part 1.5.3).
-  ansistring -> MQTTString
-  MQTTString = UTF8String;
-  *)
+  TMqttString = MQTTReadThread.TMqttString;
 
   // The message class definition
+
+  { TMQTTMessage }
+
   TMQTTMessage = class
   private
-    FTopic: ansistring;
-    FPayload: ansistring;
+    FTopic: TMqttString;
+    FPayload: TMqttString;
     FRetain: boolean;
 
   public
@@ -80,15 +80,18 @@ type
     retain : Boolean. If true, the message is a retained message and not fresh.
     mid : Integer. The message id.
     *)
-    property Topic: ansistring read FTopic;
-    property PayLoad: ansistring read FPayload;
+    property Topic: TMqttString read FTopic;
+    property PayLoad: TMqttString read FPayload;
     property Retain: boolean read FRetain;
 
-    constructor Create(const topic_: ansistring; const payload_: ansistring;
+    constructor Create(const topic_: TMqttString; const payload_: TMqttString;
       const retain_: boolean);
   end;
 
   // The acknowledgement class definition
+
+  { TMQTTMessageAck }
+
   TMQTTMessageAck = class
   private
     FMessageType: TMQTTMessageType;
@@ -117,8 +120,8 @@ type
 
   TMQTTClient = class(TObject)
   protected
-    FClientID: ansistring;
-    FHostname: ansistring;
+    FClientID: TMqttString;
+    FHostname: UTF8String;
     FPort: integer;
 
     // main background thread - using for reading
@@ -141,7 +144,7 @@ type
 
     // Gets a next Message ID and increases the Message ID Increment
     function GetMessageID: TBytes;
-    function VariableHeaderPublish(topic: ansistring): TBytes;
+    function VariableHeaderPublish(topic: TMqttString): TBytes;
     function VariableHeaderSubscribe: TBytes;
     function VariableHeaderUnsubscribe: TBytes;
     // Internally Write the provided data to the Socket. Wrapper function.
@@ -153,7 +156,7 @@ type
     procedure OnRTPingResp(Sender: TObject);
     procedure OnRTSubAck(Sender: TObject; MessageID: integer; GrantedQoS: integer);
     procedure OnRTUnSubAck(Sender: TObject; MessageID: integer);
-    procedure OnRTPublish(Sender: TObject; topic, payload: ansistring;
+    procedure OnRTPublish(Sender: TObject; topic, payload: TMqttString;
       retain: boolean);
     procedure OnRTTerminate(Sender: TObject);
 
@@ -174,18 +177,18 @@ type
     procedure Connect;
     function Disconnect: boolean;
     procedure ForceDisconnect;
-    function Publish(Topic, sPayload: ansistring; Retain: boolean = False): boolean;
-    function Subscribe(Topic: ansistring): integer;
-    function Unsubscribe(Topic: ansistring): integer;
+    function Publish(Topic, sPayload: TMqttString; Retain: boolean = False): boolean;
+    function Subscribe(Topic: TMqttString): integer;
+    function Unsubscribe(Topic: TMqttString): integer;
     function PingReq: boolean;
     function getMessage: TMQTTMessage;
     function getMessageAck: TMQTTMessageAck;
 
     //todo: ? Python: client_id="", clean_session=True, userdata=None
-    constructor Create(Hostname: ansistring; Port: integer); overload;
+    constructor Create(Hostname: UTF8String; Port: integer); overload;
     destructor Destroy; override;
 
-    property ClientID: ansistring read FClientID write FClientID;
+    property ClientID: TMqttString read FClientID write FClientID;
 
     //
     property OnConnAck: TConnAckEvent read FConnAckEvent write FConnAckEvent;
@@ -202,8 +205,8 @@ function FixedHeader(MessageType: TMQTTMessageType; Dup, Qos, Retain: byte): byt
 // Variable Header per command creation funcs
 function VariableHeaderConnect(KeepAlive: word): TBytes;
 
-// Takes a ansistring and converts to An Array of Bytes preceded by 2 Length Bytes.
-function StrToBytes(str: ansistring; perpendLength: boolean): TUTF8Text;
+// Takes a UTF8String and converts to An Array of Bytes preceded by 2 Length Bytes.
+function StrToBytes(str: UTF8String; perpendLength: boolean): TUTF8Text;
 
 procedure CopyIntoArray(var DestArray: array of byte; SourceArray: array of byte;
   StartIndex: integer);
@@ -224,7 +227,7 @@ implementation
 {$IFDEF DEBUG_MQTT_LCLLOG}
 uses LCLProc; // DbgOutThreadLog
 
-procedure WRITE_DEBUG(str: AnsiString);
+procedure WRITE_DEBUG(str: String);
 begin
   DbgOutThreadLog(TimeToStr(Now()) + '[' + IntToStr(GetTickCount64()) + ']' + str + LineEnding);
 end;
@@ -232,7 +235,7 @@ end;
 { ok, so this is a hack, but it works nicely. Just never use
   a multiline argument with WRITE_DEBUG! }
 {$IFDEF DEBUG_MQTT}
-procedure WRITE_DEBUG(str: AnsiString);
+procedure WRITE_DEBUG(str: String);
 begin
   Writeln(TimeToStr(Now()) + '[' + IntToStr(GetTickCount64()) + ']' + str + LineEnding);
 end;
@@ -242,8 +245,8 @@ end;
 {$ENDIF}
 {$ENDIF DEBUG_MQTT_LCLLOG}
 
-constructor TMQTTMessage.Create(const topic_: ansistring;
-  const payload_: ansistring; const retain_: boolean);
+constructor TMQTTMessage.Create(const topic_: TMqttString;
+  const payload_: TMqttString; const retain_: boolean);
 begin
   // Save the passed parameters
   FTopic := Topic_;
@@ -432,8 +435,8 @@ end;
   @param Retain   Should this message be retained for clients connecting subsequently
   @return Returns whether the Data was written successfully to the socket.
 ------------------------------------------------------------------------------*}
-function TMQTTClient.Publish(Topic, sPayload: ansistring;
-  Retain: boolean = False): boolean;
+function TMQTTClient.Publish(Topic, sPayload: TMqttString; Retain: boolean
+  ): boolean;
 var
   Data: TBytes;
   FH: byte;
@@ -462,7 +465,7 @@ end;
   @return Returns the Message ID used to send the message for the purpose of comparing
   it to the Message ID used later in the SUBACK event handler.
 ------------------------------------------------------------------------------*}
-function TMQTTClient.Subscribe(Topic: ansistring): integer;
+function TMQTTClient.Subscribe(Topic: TMqttString): integer;
 var
   Data: TBytes;
   FH: byte;
@@ -491,7 +494,7 @@ end;
   @return Returns the Message ID used to send the message for the purpose of comparing
   it to the Message ID used later in the UNSUBACK event handler.
 ------------------------------------------------------------------------------*}
-function TMQTTClient.Unsubscribe(Topic: ansistring): integer;
+function TMQTTClient.Unsubscribe(Topic: TMqttString): integer;
 var
   Data: TBytes;
   FH: byte;
@@ -527,7 +530,7 @@ end;
   @param Port   Port of the MQTT Server
   @return Instance
 ------------------------------------------------------------------------------*}
-constructor TMQTTClient.Create(Hostname: ansistring; Port: integer);
+constructor TMQTTClient.Create(Hostname: UTF8String; Port: integer);
 begin
   inherited Create;
   Randomize;
@@ -599,7 +602,7 @@ begin
   end;
 end;
 
-function StrToBytes(str: ansistring; perpendLength: boolean): TUTF8Text;
+function StrToBytes(str: UTF8String; perpendLength: boolean): TUTF8Text;
 var
   i, offset: integer;
 begin
@@ -684,7 +687,7 @@ begin
   Result[iByteIndex] := KeepAlive;
 end;
 
-function TMQTTClient.VariableHeaderPublish(topic: ansistring): TBytes;
+function TMQTTClient.VariableHeaderPublish(topic: TMqttString): TBytes;
 var
   BytesTopic: TUTF8Text;
 begin
@@ -792,7 +795,7 @@ begin
   end;
 end;
 
-procedure TMQTTClient.OnRTPublish(Sender: TObject; topic, payload: ansistring;
+procedure TMQTTClient.OnRTPublish(Sender: TObject; topic, payload: TMqttString;
   retain: boolean);
 begin
   if Assigned(OnPublish) and EventEnabled then

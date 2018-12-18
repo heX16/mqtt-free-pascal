@@ -31,7 +31,7 @@ type
     procedure OnPingResp(Sender: TObject);
     procedure OnSubAck(Sender: TObject; MessageID: integer; GrantedQoS: integer);
     procedure OnUnSubAck(Sender: TObject);
-    procedure OnMessage(Sender: TObject; topic, payload: ansistring; isRetain: boolean);
+    procedure OnMessage(Sender: TObject; topic, payload: TMqttString; isRetain: boolean);
 
     procedure OnTimerTick(Sender: TObject);
     procedure DoRun; override;
@@ -84,7 +84,7 @@ begin
   SyncCode.Leave;
 end;
 
-procedure TMQTTGate.OnMessage(Sender: TObject; topic, payload: ansistring;
+procedure TMQTTGate.OnMessage(Sender: TObject; topic, payload: TMqttString;
   isRetain: boolean);
 begin
   SyncCode.Enter;

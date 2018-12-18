@@ -38,6 +38,9 @@ uses
 type
   TBytes = array of byte;
 
+  // all string is UTF-8! (see doc: mqtt-v3.1.1 part 1.5.3).
+  TMqttString = UTF8String;
+
 type
   TMQTTMessage = record
     FixedHeader: byte;
@@ -55,7 +58,7 @@ type
   TConnAckEvent = procedure(Sender: TObject; ReturnCode: integer) of object;
 
   //todo: Sender: TObject; msg: TMQTTMessage; userdata: Pointer
-  TPublishEvent = procedure(Sender: TObject; topic, payload: ansistring;
+  TPublishEvent = procedure(Sender: TObject; topic, payload: TMqttString;
     retain: boolean) of object;
 
   TPingRespEvent = procedure(Sender: TObject) of object;
@@ -63,10 +66,12 @@ type
     GrantedQoS: integer) of object;
   TUnSubAckEvent = procedure(Sender: TObject; MessageID: integer) of object;
 
+  { TMQTTReadThread }
+
   TMQTTReadThread = class(TThread)
   protected
-    FClientID: ansistring;
-    FHostname: ansistring;
+    FClientID: TMqttString;
+    FHostname: UTF8String;
     FPort: integer;
     CurrentMessage: TMQTTMessage;
     // Events
@@ -76,7 +81,7 @@ type
     FSubAckEvent: TSubAckEvent;
     FUnSubAckEvent: TUnSubAckEvent;
 
-    // Takes a 2 Byte Length array and returns the length of the ansistring it preceeds as per the spec.
+    // Takes a 2 Byte Length array and returns the length of the string it preceeds as per the spec.
     function BytesToStrLength(LengthBytes: TBytes): integer;
 
     // This is our data processing and event firing command.
@@ -88,7 +93,7 @@ type
     FPSocket: TTCPBlockSocket;
     function SocketWrite(Data: TBytes): boolean;
 
-    constructor Create(Hostname: ansistring; Port: integer);
+    constructor Create(Hostname: UTF8String; Port: integer);
     property OnConnAck: TConnAckEvent read FConnAckEvent write FConnAckEvent;
     property OnPublish: TPublishEvent read FPublishEvent write FPublishEvent;
     property OnPingResp: TPingRespEvent read FPingRespEvent write FPingRespEvent;
@@ -105,7 +110,7 @@ uses
   MQTT;
 
 {$IFDEF DEBUG_MQTT_LCLLOG}
-procedure WRITE_DEBUG(str: AnsiString);
+procedure WRITE_DEBUG(str: String);
 begin
   DbgOutThreadLog(TimeToStr(Now()) + '[' + IntToStr(GetTickCount64()) + ']' + str + LineEnding);
 end;
@@ -113,7 +118,7 @@ end;
 { ok, so this is a hack, but it works nicely. Just never use
   a multiline argument with WRITE_DEBUG! }
 {$IFDEF DEBUG_MQTT}
-procedure WRITE_DEBUG(str: AnsiString);
+procedure WRITE_DEBUG(str: String);
 begin
   Writeln(TimeToStr(Now()) + '[' + IntToStr(GetTickCount64()) + ']' + str + LineEnding);
 end;
@@ -136,7 +141,7 @@ end;
 
 { TMQTTReadThread }
 
-constructor TMQTTReadThread.Create(HostName: ansistring; Port: integer);
+constructor TMQTTReadThread.Create(Hostname: UTF8String; Port: integer);
 begin
   inherited Create(True);
 
@@ -285,8 +290,8 @@ var
   DataLen: integer;
   QoS: integer;
   Retain: boolean;
-  Topic: ansistring;
-  Payload: ansistring;
+  Topic: TMqttString;
+  Payload: TMqttString;
   ResponseVH: TBytes;
   ConnectReturn: integer;
 begin
