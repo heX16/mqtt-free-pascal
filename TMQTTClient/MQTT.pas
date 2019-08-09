@@ -36,7 +36,7 @@ unit MQTT;
 interface
 
 uses
-  SysUtils, blcksock, contnrs, MQTTReadThread;
+  SysUtils, blcksock, contnrs, MQTTReadThread, dateutils;
 
 type
   //  Message type. 4 Bit unsigned.
@@ -121,6 +121,8 @@ type
   TMQTTClient = class(TObject)
   protected
     FClientID: TMqttString;
+    FUserName: TMqttString;
+    FPassword: TMqttString;
     FHostname: UTF8String;
     FPort: integer;
 
@@ -189,6 +191,8 @@ type
     destructor Destroy; override;
 
     property ClientID: TMqttString read FClientID write FClientID;
+    property UserName: TMqttString read FUserName write FUserName;
+    property Password: TMqttString read FPassword write FPassword;
 
     //
     property OnConnAck: TConnAckEvent read FConnAckEvent write FConnAckEvent;
@@ -203,7 +207,7 @@ type
 function FixedHeader(MessageType: TMQTTMessageType; Dup, Qos, Retain: byte): byte;
 
 // Variable Header per command creation funcs
-function VariableHeaderConnect(KeepAlive: word): TBytes;
+function VariableHeaderConnect(KeepAlive: word; Username: word = 0; Password: word = 0): TBytes;
 
 // Takes a UTF8String and converts to An Array of Bytes preceded by 2 Length Bytes.
 function StrToBytes(str: UTF8String; perpendLength: boolean): TUTF8Text;
@@ -348,6 +352,9 @@ end;
 function TMQTTClient.CreateMQTTThread: TMQTTReadThread;
 begin
   Result := TMQTTReadThread.Create(FHostname, FPort);
+  Result.ClientID:= FClientID;
+  Result.UserName:= FUserName;
+  Result.Password:= FPassword;
 end;
 
 procedure TMQTTClient.TerminateThread(waitThreadEnd: boolean = False);
@@ -533,12 +540,14 @@ end;
 constructor TMQTTClient.Create(Hostname: UTF8String; Port: integer);
 begin
   inherited Create;
-  Randomize;
+
   EventEnabled:=false;
   QueueEnabled:=true;
 
   // Create a Default ClientID as a default. Can be overridden with TMQTTClient.ClientID any time before connection.
-  FClientID := 'dMQTTClient' + IntToStr(Random(1000) + 1);
+  FClientID := 'tMQTTClient' + IntToStr(DateTimeToUnix(Time));
+  FUserName := '';
+  FPassword := '';
   FHostname := Hostname;
   FPort := Port;
   FMessageID := 1;
@@ -647,7 +656,7 @@ begin
   end;
 end;
 
-function VariableHeaderConnect(KeepAlive: word): TBytes;
+function VariableHeaderConnect(KeepAlive: word; Username: word = 0; Password: word = 0): TBytes;
 const
   //todo: version update! MQIsdp->MQTT. version 4!
   MQTT_PROTOCOL = 'MQIsdp';
@@ -655,8 +664,6 @@ const
 var
   Qos, Retain: word;
 {todo: connect flags support
-7 User Name Flag
-6 Password Flag
 5 Will Retain
 4 Will QoS
 3 Will QoS
@@ -680,7 +687,7 @@ begin
   Qos := 0;
   Retain := 0;
   Result[iByteIndex] := 0;
-  Result[iByteIndex] := (Retain * 32) + (Qos * 16) + (1 * 4) + (1 * 2);
+  Result[iByteIndex] := (Username * 128) + (Password * 64) + (Retain * 32) + (Qos * 16) + (1 * 4) + (1 * 2);
   Inc(iByteIndex);
   Result[iByteIndex] := 0;
   Inc(iByteIndex);
