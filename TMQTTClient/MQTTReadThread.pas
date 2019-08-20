@@ -71,6 +71,8 @@ type
   TMQTTReadThread = class(TThread)
   protected
     FClientID: TMqttString;
+    FUserName: TMqttString;
+    FPassword: TMqttString;
     FHostname: UTF8String;
     FPort: integer;
     CurrentMessage: TMQTTMessage;
@@ -99,6 +101,10 @@ type
     property OnPingResp: TPingRespEvent read FPingRespEvent write FPingRespEvent;
     property OnSubAck: TSubAckEvent read FSubAckEvent write FSubAckEvent;
     property OnUnSubAck: TUnSubAckEvent read FUnSubAckEvent write FUnSubAckEvent;
+
+    property ClientID: TMqttString read FClientID write FClientID;
+    property UserName: TMqttString read FUserName write FUserName;
+    property Password: TMqttString read FPassword write FPassword;
   end;
 
 implementation
@@ -145,8 +151,6 @@ constructor TMQTTReadThread.Create(Hostname: UTF8String; Port: integer);
 begin
   inherited Create(True);
 
-  // Create a Default ClientID as a default. Can be overridden with TMQTTClient.ClientID any time before connection.
-  FClientID := 'dMQTTClientx' + IntToStr(Random(1000) + 1);
   FHostname := Hostname;
   FPort := Port;
 end;
@@ -187,12 +191,16 @@ begin
 
           //  Build CONNECT message
           FH := FixedHeader(MQTT.CONNECT, 0, 0, 0);
-          VH := VariableHeaderConnect(40);
+          VH := VariableHeaderConnect(40, Word(FUserName > ''), Word(FPassword > ''));
           SetLength(Payload, 0);
           AppendArray(Payload, StrToBytes(FClientID, True));
           AppendArray(Payload, StrToBytes('lwt', True)); //todo: add normal "LWT" topic support
           AppendArray(Payload, StrToBytes(FClientID + ' died', True)); //todo: add normal "LWT" message support
-          {todo: add support username and password (see doc: mqtt-v3.1.1 part 3.1.3.4).
+          if FUserName > '' then
+            AppendArray(Payload, StrToBytes(FUserName, True));
+          if FPassword > '' then
+            AppendArray(Payload, StrToBytes(FPassword, True));
+          {todo: TEST support username and password (see doc: mqtt-v3.1.1 part 3.1.3.4).
           http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html#_Toc398718031
           Need just add to payload.
           "These fields, if present, MUST appear in the order Client Identifier, Will Topic, Will Message, User Name, Password [MQTT-3.1.3-1]."
